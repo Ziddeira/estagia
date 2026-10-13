@@ -97,7 +97,7 @@ export default function AppAluno() {
               ))}
             </div>
             <label className="pcard" style={{ fontWeight: 700 }}>O que aprendeu ou observou
-              <textarea rows="4" disabled={!editavel} value={obs} onChange={(e) => setObs(e.target.value)} style={{ border: '1px solid #C9D2CD', borderRadius: 10, padding: 10, fontWeight: 400 }} />
+              <textarea rows="4" disabled={!editavel} value={obs} onChange={(e) => setObs(e.target.value)} style={{ border: '1px solid #85918B', borderRadius: 10, padding: 10, fontWeight: 400 }} />
               <span className="txt-at" style={{ fontSize: 13 }}>Não escreva nome, leito ou prontuário de paciente.</span>
             </label>
             {editavel && <button className="btn btn-p btn-grande" onClick={enviar}>{ficha?.status === 'corrigir' ? 'Reenviar corrigida' : 'Enviar para a preceptora'}</button>}

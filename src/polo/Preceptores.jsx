@@ -102,7 +102,7 @@ export default function Preceptores() {
               const feito = off < 0, agora = off === 0;
               return (
                 <div key={nome} style={{ display: 'grid', gridTemplateColumns: '20px 1.4fr 1fr 1.3fr 64px', gap: 10, alignItems: 'center', padding: '8px 0', borderTop: '1px solid var(--linha-2)' }}>
-                  <span aria-hidden="true" style={{ width: 14, height: 14, borderRadius: '50%', background: feito ? 'var(--verde)' : '#fff', border: `2px solid ${feito ? 'var(--verde)' : agora ? '#B8621B' : '#C9D2CD'}` }} />
+                  <span aria-hidden="true" style={{ width: 14, height: 14, borderRadius: '50%', background: feito ? 'var(--verde)' : '#fff', border: `2px solid ${feito ? 'var(--verde)' : agora ? '#B8621B' : '#85918B'}` }} />
                   <strong style={{ fontSize: 14 }}>{nome}</strong>
                   <span className="pequeno apagado">{quem}</span>
                   <span className="pequeno apagado">{prazo}</span>
