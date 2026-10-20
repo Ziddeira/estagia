@@ -10,7 +10,7 @@ import Convenios from './polo/Convenios.jsx';
 import Preceptores from './polo/Preceptores.jsx';
 import Avaliacoes from './polo/Avaliacoes.jsx';
 import Ocorrencias from './polo/Ocorrencias.jsx';
-import Empresa from './polo/Empresa.jsx';
+import Campo from './polo/Campo.jsx';
 import Mec from './polo/Mec.jsx';
 import Documentos from './polo/Documentos.jsx';
 import AppAluno from './app/AppAluno.jsx';
@@ -27,12 +27,12 @@ export default function App() {
           <Route path="escala" element={<Escala />} />
           <Route path="presenca" element={<Presenca />} />
           <Route path="alunos" element={<Alunos />} />
+          <Route path="campo" element={<Campo />} />
           <Route path="cursos" element={<Cursos />} />
           <Route path="convenios" element={<Convenios />} />
           <Route path="preceptores" element={<Preceptores />} />
           <Route path="avaliacoes" element={<Avaliacoes />} />
           <Route path="ocorrencias" element={<Ocorrencias />} />
-          <Route path="empresa" element={<Empresa />} />
           <Route path="mec" element={<Mec />} />
           <Route path="documentos" element={<Documentos />} />
         </Route>

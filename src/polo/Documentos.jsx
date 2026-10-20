@@ -37,7 +37,7 @@ export default function Documentos() {
       c.documentos.calendario = true;
       c.documentos.arquivos.push({ nome: 'Calendário acadêmico 2026.2.pdf', desc: 'Datas do semestre', st: 'lido' });
       c.documentos.sug.push(
-        S('c1', 'pág. 2', 'Estágio em empresa', 'Semana de avaliações: 23 a 27 de novembro', 'Marca a semana de provas: jornada dos estagiários em empresa cai pela metade e as empresas são avisadas.'),
+        S('c1', 'pág. 2', 'Escala', 'Semana de avaliações: 23 a 27 de novembro', 'Marca a semana de provas na escala: o sistema avisa quando um turno de estágio cair no horário de prova do aluno.'),
         S('c2', 'pág. 2', 'Escala', 'Recesso acadêmico: 21/12/2026 a 31/01/2027', 'Bloqueia a escala de estágio no recesso, a não ser que o curso libere.')
       );
     });

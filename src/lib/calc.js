@@ -1,6 +1,6 @@
 // Regras e cálculos usados pelas telas.
-import { CURSOS, GRUPOS, PRECEPTORES, TURNOS, DOCS, RELPEND, LIMITE_MENSAL } from '../data/seed.js';
-import { hojeISO, addDias, mesAno, FERIADOS, fmt } from './date.js';
+import { CURSOS, GRUPOS, PRECEPTORES, TURNOS, DOCS, RELPEND, LIMITE_MENSAL, MAX_DIA, MAX_SEMANA, ETAPAS, PRAZO_VALIDACAO } from '../data/seed.js';
+import { hojeISO, addDias, mesAno, FERIADOS, fmt, fimDeSemana, inicioSemana, dow, diffDias, diaUtil, diaDaSemana } from './date.js';
 
 export const G = Object.fromEntries(GRUPOS.map((g) => [g.id, g]));
 export const P = Object.fromEntries(PRECEPTORES.map((p) => [p.id, p]));
@@ -55,6 +55,16 @@ export function turnoHojeDoGrupo(s, gid) {
   return s.turnos.find((t) => t.grupo === gid && t.data === H) || null;
 }
 
+// Horas do grupo (e de cada aluno dele) num dia e na semana de segunda a domingo
+export function horasGrupoDia(turnos, grupo, data) {
+  return turnos.filter((t) => t.grupo === grupo && t.data === data).reduce((a, t) => a + TURNOS[t.turno].ch, 0);
+}
+
+export function horasGrupoSemana(turnos, grupo, data) {
+  const ini = inicioSemana(data), fim = addDias(ini, 6);
+  return turnos.filter((t) => t.grupo === grupo && t.data >= ini && t.data <= fim).reduce((a, t) => a + TURNOS[t.turno].ch, 0);
+}
+
 // Horas confirmadas de um aluno, por cenário
 export function horasAluno(s, gid, i) {
   const g = G[gid];
@@ -81,7 +91,14 @@ export function validarTurno(s, f) {
   const loc = local(s, f.local);
   if (!f.data) erros.push('Escolha a data.');
   else if (f.data < minimo) erros.push(`A CLT exige convocar o preceptor intermitente com 3 dias corridos de antecedência (art. 452-A). Primeira data possível: ${fmt(minimo)}.`);
-  if (FERIADOS[f.data]) erros.push(`Essa data é feriado nacional (${FERIADOS[f.data]}).`);
+  if (FERIADOS[f.data]) erros.push(`Essa data é feriado nacional (${FERIADOS[f.data]}). Feriado não conta como hora de estágio no AVA.`);
+  if (f.data && fimDeSemana(f.data) && !s.regras.fds) erros.push(`${dow(f.data) === 'Sáb' ? 'Sábado' : 'Domingo'} não pode ser lançado no AVA desta instituição. Escolha um dia de segunda a sexta, ou mude a regra em Cursos e regras.`);
+  if (f.data) {
+    const dia = horasGrupoDia(s.turnos, f.grupo, f.data) + ch;
+    if (dia > MAX_DIA) erros.push(`O ${g.nome} ficaria com ${dia}h de estágio em ${fmt(f.data)}. A Lei do Estágio permite no máximo ${MAX_DIA}h por dia.`);
+    const sem = horasGrupoSemana(s.turnos, f.grupo, f.data) + ch;
+    if (sem > MAX_SEMANA) erros.push(`O ${g.nome} ficaria com ${sem}h na semana de ${fmt(inicioSemana(f.data))}. A Lei do Estágio permite no máximo ${MAX_SEMANA}h por semana.`);
+  }
   if (k.kP[`${f.prec}|${f.data}|${f.turno}`]) erros.push(`${P[f.prec].nome} já tem turno nesse dia e horário.`);
   if (k.kG[`${f.grupo}|${f.data}|${f.turno}`]) erros.push(`O ${g.nome} já está escalado nesse dia e horário.`);
   const total = f.data ? horasPrecMes(s.turnos, f.prec, mesAno(f.data)) + ch : 0;
@@ -89,6 +106,7 @@ export function validarTurno(s, f) {
   if (g.alunos.length > cur.limite) erros.push(`${g.nome} tem ${g.alunos.length} alunos e o limite por supervisor é ${cur.limite} (${cur.fonte}). Divida o grupo antes de escalar.`);
   if (loc && !loc.definido) erros.push(`${loc.nome} ainda não tem área de check-in. Marque o ponto em Convênios e vagas.`);
   if (loc && loc.fim < (f.data || H)) erros.push(`O convênio com ${loc.nome} estará vencido nessa data.`);
+  if (loc && loc.situacao === 'validacao') erros.push(`${loc.nome} ainda está em validação pela instituição. Só dá para escalar depois de validado.`);
   const nBl = g.alunos.filter((_, i) => bloqueado(g.id, i)).length;
   if (nBl) avisos.push(`${nBl} ${nBl === 1 ? 'aluno fica' : 'alunos ficam'} fora deste turno até regularizar documento.`);
   return { erros, avisos, total };
@@ -107,6 +125,31 @@ export function alertas(s) {
       lista.push({ tom: 'erro', tag: 'Bloqueio', titulo: `${P[t.prec].nome} está em dois lugares ao mesmo tempo`, texto: `${fmt(t.data)} (${TURNOS[t.turno].label}): dois turnos no mesmo horário, com o mesmo grupo.`, acao: 'Abrir escala', ir: '/polo/escala' });
     }
   });
+  // Jornada do aluno: 6h por dia, 30h por semana e fim de semana
+  const vistosDia = {}, vistosSem = {};
+  ord.filter((t) => t.data >= H).forEach((t) => {
+    const g = G[t.grupo];
+    const kd = `${t.grupo}|${t.data}`, ks = `${t.grupo}|${inicioSemana(t.data)}`;
+    const dia = horasGrupoDia(s.turnos, t.grupo, t.data);
+    if (dia > MAX_DIA && !vistosDia[kd] && !(k.kG[`${t.grupo}|${t.data}|${t.turno}`] > 1)) {
+      vistosDia[kd] = 1;
+      lista.push({ tom: 'erro', tag: 'Bloqueio', titulo: `${g.nome} com ${dia}h no mesmo dia`, texto: `${fmt(t.data)}: a Lei do Estágio permite no máximo ${MAX_DIA}h por dia. Tire um dos turnos.`, acao: 'Abrir escala', ir: '/polo/escala' });
+    }
+    const sem = horasGrupoSemana(s.turnos, t.grupo, t.data);
+    if (sem > MAX_SEMANA && !vistosSem[ks]) {
+      vistosSem[ks] = 1;
+      lista.push({ tom: 'erro', tag: 'Bloqueio', titulo: `${g.nome} passa de ${MAX_SEMANA}h na semana`, texto: `Semana de ${fmt(inicioSemana(t.data))}: ${sem}h escaladas para ${MAX_SEMANA}h permitidas.`, acao: 'Abrir escala', ir: '/polo/escala' });
+    }
+    if (!s.regras.fds && fimDeSemana(t.data)) lista.push({ tom: 'erro', tag: 'Bloqueio', titulo: 'Turno no fim de semana', texto: `${g.nome} em ${fmt(t.data)} (${dow(t.data)}): o AVA desta instituição não aceita horas no sábado e no domingo. O aluno não vai conseguir lançar essas horas.`, acao: 'Abrir escala', ir: '/polo/escala' });
+  });
+  // Campo de estágio: validação demorando e alunos sem associação
+  const campo = Object.entries(s.campo || {});
+  campo.filter(([, c]) => c.etapa === 1 && diffDias(c.datas[1], H) > PRAZO_VALIDACAO).forEach(([key, c]) => {
+    const [gid, i] = key.split(':');
+    lista.push({ tom: 'at', tag: 'Atenção', titulo: 'Validação da empresa passou do prazo', texto: `${G[gid].alunos[i]}: ${local(s, c.local).nome} está em validação há ${diffDias(c.datas[1], H)} dias (prazo de ${PRAZO_VALIDACAO}). Cobre pelo protocolo ${c.protocolo}.`, acao: 'Ver campo de estágio', ir: '/polo/campo' });
+  });
+  const semAssoc = campo.filter(([, c]) => c.etapa < 3).length;
+  if (semAssoc) lista.push({ tom: 'at', tag: 'Atenção', titulo: `${semAssoc} ${semAssoc === 1 ? 'aluno ainda não associado' : 'alunos ainda não associados'} ao campo`, texto: 'Sem a associação, o aluno não consegue lançar as horas no AVA.', acao: 'Ver campo de estágio', ir: '/polo/campo' });
   GRUPOS.forEach((g) => {
     const cur = CURSOS[g.curso];
     if (g.alunos.length > cur.limite) lista.push({ tom: 'erro', tag: 'Bloqueio', titulo: `${g.nome} acima do limite do conselho`, texto: `${g.alunos.length} alunos para 1 supervisor; o limite é ${cur.limite} (${cur.fonte}).`, acao: 'Ver regras do curso', ir: '/polo/cursos' });
@@ -137,3 +180,36 @@ export function alertas(s) {
   if (fichasPend) lista.push({ tom: 'at', tag: 'Atenção', titulo: `${fichasPend} fichas de acompanhamento aguardando o preceptor`, texto: 'Fichas enviadas pelos alunos que ainda não foram conferidas.', acao: 'Ver presença', ir: '/polo/presenca' });
   return lista;
 }
+
+// Calcula o período para lançar no AVA: anda dia a dia a partir do início,
+// soma as horas da planilha semanal e pula feriados (e fins de semana, se a regra pedir).
+// planilha: { 1: 'mat', 2: null, ... } por dia da semana (0 = domingo)
+export function periodoAVA({ inicio, ch, planilha, fds = false }) {
+  const porSemana = Object.entries(planilha).reduce((a, [, t]) => a + (t ? TURNOS[t].ch : 0), 0);
+  const erros = [];
+  if (!inicio) erros.push('Escolha a data de início.');
+  if (!(ch > 0)) erros.push('Informe a carga horária a cumprir.');
+  if (!porSemana) erros.push('Marque pelo menos um dia com horário.');
+  if (porSemana > MAX_SEMANA) erros.push(`A planilha soma ${porSemana}h por semana. O limite é ${MAX_SEMANA}h.`);
+  if (!fds && (planilha[0] || planilha[6])) erros.push('O AVA não aceita sábado nem domingo.');
+  if (erros.length) return { erros, porSemana };
+  let x = inicio, soma = 0, dias = 0, guarda = 0, primeiro = null;
+  const pulados = [];
+  while (soma < ch && guarda++ < 1500) {
+    const t = planilha[diaDaSemana(x)];
+    if (t) {
+      if (FERIADOS[x]) pulados.push({ data: x, nome: FERIADOS[x] });
+      else if (fds || !fimDeSemana(x)) { soma += TURNOS[t].ch; dias++; if (!primeiro) primeiro = x; }
+    }
+    if (soma < ch) x = addDias(x, 1);
+  }
+  return { erros, inicio: primeiro || inicio, fim: x, dias, soma, porSemana, pulados, sobra: soma - ch };
+}
+
+export function proximoDiaUtil(iso) {
+  let x = iso;
+  while (!diaUtil(x)) x = addDias(x, 1);
+  return x;
+}
+
+export const etapaInfo = (n) => ETAPAS[n];

@@ -13,7 +13,7 @@ function carregar() {
     if (bruto) {
       const s = JSON.parse(bruto);
       // Recria os dados quando o dia muda, para o turno de "hoje" continuar sendo hoje
-      if (s && s.versao === 1 && s.criadoEm === hojeISO()) return s;
+      if (s && s.versao === 2 && s.criadoEm === hojeISO()) return s;
     }
   } catch (e) { /* navegador sem armazenamento: segue com dados novos */ }
   return criarEstado();

@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../store.jsx';
 import { Cabecalho, Chip, Barra } from '../components/ui.jsx';
-import { CURSOS, GRUPOS, PRECEPTORES, TURNOS, LIMITE_MENSAL } from '../data/seed.js';
-import { G, P, chaves, emConflito, horasPrecMes, ordenar, validarTurno, cenNome, local } from '../lib/calc.js';
-import { hojeISO, addDias, fmt, dow, mesAno, nomeMes } from '../lib/date.js';
+import Impressao from '../components/Impressao.jsx';
+import { CURSOS, GRUPOS, PRECEPTORES, TURNOS, LIMITE_MENSAL, MAX_SEMANA } from '../data/seed.js';
+import { G, P, chaves, emConflito, horasPrecMes, ordenar, validarTurno, cenNome, local, horasGrupoSemana, proximoDiaUtil } from '../lib/calc.js';
+import { hojeISO, addDias, fmt, fmtAno, dow, mesAno, nomeMes, inicioSemana } from '../lib/date.js';
 
 export default function Escala() {
   const { s, up, toast, registrar } = useStore();
   const H = hojeISO();
   const mes = mesAno(H);
-  const [f, setF] = useState({ grupo: 'enf1', prec: 'ana', local: 'hm', cen: 'hosp', data: addDias(H, 12), turno: 'mat' });
+  const [f, setF] = useState({ grupo: 'enf1', prec: 'ana', local: 'hm', cen: 'hosp', data: proximoDiaUtil(addDias(H, 12)), turno: 'mat' });
+  const [lista, setLista] = useState(null);
   const k = chaves(s.turnos);
   const val = validarTurno(s, f);
   const ok = val.erros.length === 0;
@@ -62,7 +64,7 @@ export default function Escala() {
 
       <section className="card">
         <h2>Novo turno</h2>
-        <p className="apagado" style={{ fontSize: 14 }}>Confere: 3 dias de antecedência para convocar (CLT), feriado, conflito de horário, limite de horas do preceptor, limite de alunos do conselho, convênio vigente, área de check-in e documentos dos alunos.</p>
+        <p className="apagado" style={{ fontSize: 14 }}>Confere: 3 dias de antecedência para convocar (CLT), feriado, sábado e domingo (o AVA não aceita), até 6h por dia e 30h por semana para o aluno (Lei do Estágio), conflito de horário, limite de horas do preceptor, limite de alunos do conselho, convênio vigente, área de check-in e documentos dos alunos.</p>
         <div className="form-grid">
           <label className="campo">Grupo de alunos
             <select value={f.grupo} onChange={(e) => mudarGrupo(e.target.value)}>
@@ -97,7 +99,7 @@ export default function Escala() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 360px', fontSize: 14, fontWeight: 600 }}>
             {val.erros.map((e) => <span key={e} className="txt-erro">{e}</span>)}
             {val.avisos.map((e) => <span key={e} className="txt-at">{e}</span>)}
-            {ok && <span className="txt-ok">Tudo certo. {P[f.prec].nome} ficará com {val.total}h de {LIMITE_MENSAL}h no mês.</span>}
+            {ok && <span className="txt-ok">Tudo certo. {P[f.prec].nome} ficará com {val.total}h de {LIMITE_MENSAL}h no mês, e o {g.nome} com {horasGrupoSemana(s.turnos, f.grupo, f.data) + TURNOS[f.turno].ch}h de {MAX_SEMANA}h na semana de {fmt(inicioSemana(f.data))}.</span>}
           </div>
           <button className="btn btn-p" disabled={!ok} onClick={adicionar}>Adicionar e convocar</button>
         </div>
@@ -126,8 +128,11 @@ export default function Escala() {
                     <td className="mono">{TURNOS[t.turno].ch}h</td>
                     <td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><Chip tom={st[1]}>{st[0]}</Chip>{conf && <Chip tom="erro">Conflito</Chip>}</div></td>
                     <td>
-                      {t.data <= H && !t.pres && <Link className="btn btn-p" to={`/polo/presenca?turno=${t.id}`}>Ver presença</Link>}
-                      {t.data > H && <button className="btn btn-n" onClick={() => remover(t)}>Remover</button>}
+                      {t.data <= H && !t.pres && <Link className="btn btn-p" style={{ marginBottom: 6 }} to={`/polo/presenca?turno=${t.id}`}>Ver presença</Link>}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {t.data > H && <button className="btn btn-n" onClick={() => remover(t)}>Remover</button>}
+                        {!t.pres && <button className="btn btn-n" onClick={() => setLista(t)}>Lista em papel</button>}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -136,6 +141,21 @@ export default function Escala() {
           </table>
         </div>
       </section>
+
+      {lista && (
+        <Impressao titulo="Lista de presença em papel" onFechar={() => setLista(null)}>
+          <h2>Lista de presença de estágio</h2>
+          <p><strong>Local:</strong> {local(s, lista.local).nome} · <strong>Cenário:</strong> {cenNome(lista.grupo, lista.cen)}<br />
+            <strong>Data:</strong> {fmtAno(lista.data)} ({dow(lista.data)}) · <strong>Turno:</strong> {TURNOS[lista.turno].label}, {TURNOS[lista.turno].hora}<br />
+            <strong>Preceptor:</strong> {P[lista.prec].nome} · {P[lista.prec].reg} · <strong>Grupo:</strong> {G[lista.grupo].nome}</p>
+          <table>
+            <thead><tr><th style={{ width: '40%' }}>Aluno</th><th>Entrada</th><th>Saída</th><th style={{ width: '30%' }}>Assinatura</th></tr></thead>
+            <tbody>{G[lista.grupo].alunos.map((a) => <tr key={a}><td>{a}</td><td></td><td></td><td></td></tr>)}</tbody>
+          </table>
+          <p style={{ fontSize: 12 }}>Use esta lista só quando o check-in pelo celular não funcionar (sem sinal, celular sem bateria). O preceptor confirma a presença no app depois e a coordenação anexa a foto desta folha ao turno.</p>
+          <div className="linha-assinatura">Assinatura do preceptor</div>
+        </Impressao>
+      )}
     </>
   );
 }

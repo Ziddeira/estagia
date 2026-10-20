@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useStore } from '../store.jsx';
 import Phone from './Phone.jsx';
 import Checkin from './Checkin.jsx';
+import CalculadoraAVA from '../components/CalculadoraAVA.jsx';
 import { Chip, Barra } from '../components/ui.jsx';
 import { ATIVIDADES, TURNOS } from '../data/seed.js';
 import { G, P, local, cenNome, horasAluno, ordenar, turnoHojeDoGrupo } from '../lib/calc.js';
 import { hojeISO, fmt, dow } from '../lib/date.js';
 
-const GID = 'enf1', IDX = 0;
+const GID = 'enf1', IDX = 0, KEY = 'enf1:0';
 const ST_FICHA = { enviada: ['Enviada · aguardando a preceptora', 'at'], ok: ['Confirmada pela preceptora', 'ok'], corrigir: ['Correção pedida', 'erro'] };
 
 export default function AppAluno() {
@@ -45,6 +46,12 @@ export default function AppAluno() {
   };
 
   const meuCk = t?.checkins?.[IDX] || null;
+  const campo = s.campo[KEY];
+  const lancei = () => {
+    up((c) => { c.campo[KEY].etapa = 5; c.campo[KEY].datas[5] = H; });
+    registrar('Beatriz Souza informou que lançou as horas no AVA');
+    toast('Pronto. O polo vê que você lançou as horas no AVA.');
+  };
   const titulos = { hoje: 'Hoje', ficha: 'Ficha de acompanhamento', horas: 'Minhas horas', docs: 'Documentos' };
 
   return (
@@ -70,6 +77,13 @@ export default function AppAluno() {
             </>
           ) : (
             <div className="pcard"><strong>Sem estágio hoje</strong><span className="apagado">Veja os próximos turnos na aba Horas.</span></div>
+          )}
+          {campo?.etapa === 4 && (
+            <button className="alerta-box" style={{ border: 0, textAlign: 'left', cursor: 'pointer' }} onClick={() => setAba('horas')}>
+              <strong className="txt-at">Seu estágio foi associado: lance as horas no AVA</strong>
+              <div style={{ fontSize: 14 }}>O app calcula a data de início, a data de fim e os horários certos.</div>
+              <div style={{ fontSize: 13, color: 'var(--verde)', fontWeight: 700, marginTop: 4 }}>Ver como lançar</div>
+            </button>
           )}
           {corrigir && (
             <button className="alerta-box" style={{ border: 0, textAlign: 'left', cursor: 'pointer' }} onClick={() => abrirFicha(corrigir[0])}>
@@ -107,6 +121,18 @@ export default function AppAluno() {
 
       {aba === 'horas' && (
         <>
+          <div className="pcard">
+            <span className="rot">Lançar no AVA</span>
+            {campo?.etapa < 3 && <span style={{ fontSize: 14 }}>O polo ainda está cadastrando o seu local de estágio. O botão de cadastro de estágio só aparece no AVA depois que o polo associar você à empresa. Você recebe um aviso.</span>}
+            {(campo?.etapa === 3 || campo?.etapa === 4) && (
+              <>
+                <span style={{ fontSize: 14 }}>No AVA, abra <strong>Cadastro de estágio &gt; Editar estágio</strong> e preencha com o que aparece abaixo.</span>
+                <CalculadoraAVA compacto chInicial={150} />
+                <button className="btn btn-p btn-grande" onClick={lancei}>Já lancei no AVA</button>
+              </>
+            )}
+            {campo?.etapa === 5 && <span className="txt-ok" style={{ fontSize: 14, fontWeight: 600 }}>Horas lançadas no AVA em {fmt(campo.datas[5])}.</span>}
+          </div>
           <div className="pcard">
             <strong>Horas confirmadas por cenário</strong>
             {horasAluno(s, GID, IDX).map((c) => (

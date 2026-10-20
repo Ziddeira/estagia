@@ -67,3 +67,25 @@ export const FERIADOS = {
   '2027-10-12': 'Nossa Senhora Aparecida', '2027-11-02': 'Finados', '2027-11-15': 'Proclamação da República',
   '2027-11-20': 'Consciência Negra', '2027-12-25': 'Natal'
 };
+
+// Fim de semana e dias úteis (sábado e domingo; feriados nacionais à parte)
+export function fimDeSemana(iso) {
+  const d = fromISO(iso).getDay();
+  return d === 0 || d === 6;
+}
+
+export function diaUtil(iso) {
+  return !fimDeSemana(iso) && !FERIADOS[iso];
+}
+
+// Segunda-feira da semana da data (semana de segunda a domingo)
+export function inicioSemana(iso) {
+  const d = fromISO(iso).getDay();
+  return addDias(iso, d === 0 ? -6 : 1 - d);
+}
+
+export function diaDaSemana(iso) {
+  return fromISO(iso).getDay();
+}
+
+export const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];

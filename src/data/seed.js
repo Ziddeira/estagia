@@ -1,6 +1,6 @@
 // Dados fictícios da demonstração. As datas são calculadas a partir de hoje,
 // então a demonstração sempre tem um turno "hoje", turnos passados e futuros.
-import { hojeISO, addDias } from '../lib/date.js';
+import { hojeISO, addDias, diaUtil, fimDeSemana } from '../lib/date.js';
 
 export const TURNOS = {
   mat: { label: 'Matutino', hora: '07:30–13:30', ch: 6 },
@@ -8,6 +8,21 @@ export const TURNOS = {
 };
 
 export const LIMITE_MENSAL = 55;
+
+// Limites da Lei 11.788/2008 (art. 10, ensino superior): por aluno
+export const MAX_DIA = 6;
+export const MAX_SEMANA = 30;
+
+// Etapas do campo de estágio de cada aluno, da ficha ao lançamento das horas
+export const ETAPAS = [
+  { id: 0, nome: 'Ficha recebida', prox: 'Cadastrar a empresa no sistema da instituição', tom: 'at' },
+  { id: 1, nome: 'Empresa em validação', prox: 'Aguardar a validação da instituição (até 7 dias)', tom: 'info' },
+  { id: 2, nome: 'Empresa validada', prox: 'Associar o aluno à empresa e ao supervisor de campo', tom: 'at' },
+  { id: 3, nome: 'Aluno associado', prox: 'Avisar o aluno que já pode lançar as horas', tom: 'at' },
+  { id: 4, nome: 'Aluno avisado', prox: 'Aluno lança o período e os horários no AVA', tom: 'info' },
+  { id: 5, nome: 'Horas lançadas', prox: 'Nada a fazer', tom: 'ok' }
+];
+export const PRAZO_VALIDACAO = 7;
 
 export const CURSOS = {
   enf: { nome: 'Enfermagem', conselho: 'Coren', limite: 10, fonte: 'teto da Lei 11.788; confirmar regra do Coren', matriz: 'DCN 2001 · divisão do PPC', cen: [{ id: 'hosp', nome: 'Hospitalar', meta: 480 }, { id: 'ap', nome: 'Atenção primária', meta: 320 }] },
@@ -61,6 +76,13 @@ const P0 = { lat: -27.6455, lng: -48.6697 };
 export function criarEstado() {
   const H = hojeISO();
   const d = (n) => addDias(H, n);
+  // Dia útil mais próximo, andando para longe de hoje (o turno de hoje fica hoje)
+  const du = (n) => {
+    if (n === 0) return H;
+    let x = d(n);
+    while (!diaUtil(x)) x = addDias(x, n < 0 ? -1 : 1);
+    return x;
+  };
   const G = {};
   GRUPOS.forEach((g) => { G[g.id] = g; });
   const bloq = (gid, i) => DOCS[`${gid}:${i}`]?.nivel === 'bloq';
@@ -70,7 +92,7 @@ export function criarEstado() {
     return m;
   };
   let n = 0;
-  const t = (prec, grupo, local, cen, dia, turno, p) => ({ id: `t${++n}`, prec, grupo, local, cen, data: d(dia), turno, pres: p || null, precCheckin: p ? { hora: '07:15', dist: 35, dentro: true } : null, checkins: {} });
+  const t = (prec, grupo, local, cen, dia, turno, p) => ({ id: `t${++n}`, prec, grupo, local, cen, data: du(dia), turno, pres: p || null, precCheckin: p ? { hora: '07:15', dist: 35, dentro: true } : null, checkins: {} });
 
   const turnos = [
     t('ana', 'enf1', 'hm', 'hosp', -11, 'mat', pres('enf1')),
@@ -118,29 +140,28 @@ export function criarEstado() {
   };
 
   return {
-    versao: 1,
+    versao: 2,
     criadoEm: H,
     turnos,
     fichas,
     locais: [
-      { id: 'hm', nome: 'Hospital Municipal', tipo: 'Público · contrato ensino-saúde (COAPES)', fim: d(170), vagas: [['Enfermagem', 12, 11], ['Fisioterapia', 4, 4], ['Nutrição', 4, 4], ['Radiologia', 4, 4]], contra: 'Capacitação da equipe: 40h por semestre', lat: P0.lat, lng: P0.lng, raio: 150, definido: true },
-      { id: 'ubs', nome: 'UBS Centro', tipo: 'Público · COAPES', fim: d(170), vagas: [['Enfermagem', 10, 11], ['Fisioterapia', 4, 4], ['Nutrição', 4, 4]], contra: 'Apoio em campanhas de vacinação', lat: P0.lat + 0.006, lng: P0.lng + 0.004, raio: 100, definido: true },
-      { id: 'cr', nome: 'Clínica de Reabilitação', tipo: 'Privado', fim: d(63), vagas: [['Fisioterapia', 6, 4]], contra: 'Sem contrapartida', lat: P0.lat - 0.004, lng: P0.lng + 0.008, raio: 50, definido: true },
-      { id: 'lab', nome: 'Laboratório Vida (fictício)', tipo: 'Privado', fim: d(24), vagas: [['Biomedicina', 8, 9]], contra: 'Sem contrapartida', lat: P0.lat + 0.01, lng: P0.lng - 0.003, raio: 50, definido: true },
-      { id: 'ci', nome: 'Centro de Imagem Sul (fictício)', tipo: 'Privado', fim: d(-12), vagas: [['Radiologia', 4, 4]], contra: 'Sem contrapartida', lat: null, lng: null, raio: 100, definido: false },
-      { id: 'rp', nome: 'Restaurante Popular (fictício)', tipo: 'Público municipal', fim: d(260), vagas: [['Nutrição', 4, 4]], contra: 'Oficinas de educação alimentar', lat: P0.lat - 0.008, lng: P0.lng - 0.006, raio: 100, definido: true }
+      { id: 'hm', sup: { nome: 'Ana Ribeiro', formacao: 'Enfermagem', registro: 'Coren-SC [nº]' }, situacao: 'ativo', nome: 'Hospital Municipal', tipo: 'Público · contrato ensino-saúde (COAPES)', fim: d(170), vagas: [['Enfermagem', 12, 11], ['Fisioterapia', 4, 4], ['Nutrição', 4, 4], ['Radiologia', 4, 4]], contra: 'Capacitação da equipe: 40h por semestre', lat: P0.lat, lng: P0.lng, raio: 150, definido: true },
+      { id: 'ubs', sup: { nome: 'Carlos Mendes', formacao: 'Enfermagem', registro: 'Coren-SC [nº]' }, situacao: 'ativo', nome: 'UBS Centro', tipo: 'Público · COAPES', fim: d(170), vagas: [['Enfermagem', 10, 11], ['Fisioterapia', 4, 4], ['Nutrição', 4, 4]], contra: 'Apoio em campanhas de vacinação', lat: P0.lat + 0.006, lng: P0.lng + 0.004, raio: 100, definido: true },
+      { id: 'cr', sup: { nome: 'Juliana Prado', formacao: 'Fisioterapia', registro: 'Crefito [nº]' }, situacao: 'ativo', nome: 'Clínica de Reabilitação', tipo: 'Privado', fim: d(63), vagas: [['Fisioterapia', 6, 4]], contra: 'Sem contrapartida', lat: P0.lat - 0.004, lng: P0.lng + 0.008, raio: 50, definido: true },
+      { id: 'lab', sup: { nome: 'Diego Fontes', formacao: 'Biomedicina', registro: 'CRBM [nº]' }, situacao: 'ativo', nome: 'Laboratório Vida (fictício)', tipo: 'Privado', fim: d(24), vagas: [['Biomedicina', 8, 9]], contra: 'Sem contrapartida', lat: P0.lat + 0.01, lng: P0.lng - 0.003, raio: 50, definido: true },
+      { id: 'ci', sup: { nome: 'Paula Vieira', formacao: 'Radiologia', registro: 'CRTR [nº]' }, situacao: 'ativo', nome: 'Centro de Imagem Sul (fictício)', tipo: 'Privado', fim: d(-12), vagas: [['Radiologia', 4, 4]], contra: 'Sem contrapartida', lat: null, lng: null, raio: 100, definido: false },
+      { id: 'rp', sup: { nome: 'Renata Lopes', formacao: 'Nutrição', registro: 'CRN [nº]' }, situacao: 'ativo', nome: 'Restaurante Popular (fictício)', tipo: 'Público municipal', fim: d(260), vagas: [['Nutrição', 4, 4]], contra: 'Oficinas de educação alimentar', lat: P0.lat - 0.008, lng: P0.lng - 0.006, raio: 100, definido: true }
     ],
+    // Fim de semana: o AVA não aceita. Se a demonstração for aberta num sábado ou domingo,
+    // a regra fica ligada só para o turno de hoje existir.
+    regras: { fds: fimDeSemana(H), fdsDemo: fimDeSemana(H) },
+    campo: criarCampo(d),
     convocacoes: [
       { id: 'c1', prec: 'ana', turno: 'Hoje · Hospital Municipal · matutino', enviada: d(-7), antec: 7, prazo: d(-6), st: 'aceita' },
-      { id: 'c2', prec: 'ana', turno: `${d(2)} · UBS Centro · matutino`, enviada: d(-1), antec: 3, prazo: d(0), st: 'aguardando' },
-      { id: 'c3', prec: 'juliana', turno: `${d(1)} · Hospital Municipal · matutino`, enviada: d(-1), antec: 2, prazo: d(0), st: 'curta' },
-      { id: 'c4', prec: 'diego', turno: `${d(2)} · Laboratório Vida · matutino`, enviada: d(-5), antec: 7, prazo: d(-4), st: 'silencio' },
-      { id: 'c5', prec: 'paula', turno: `${d(3)} · Centro de Imagem Sul · vespertino`, enviada: d(-2), antec: 5, prazo: d(1), st: 'aguardando' }
-    ],
-    lancamentos: [
-      { id: 'l1', aluno: 'Letícia Araújo', curso: 'Administração', empresa: 'Contábil Silva (fictícia)', sup: 'Renata Silva', periodo: `${d(-8)} a ${d(-4)}`, horas: 30, dias: 5, status: 'pendente' },
-      { id: 'l2', aluno: 'Bruno Teixeira', curso: 'Pedagogia', empresa: 'Escola Pequeno Saber (fictícia)', sup: 'Márcia Lopes', periodo: `${d(-8)} a ${d(-4)}`, horas: 20, dias: 5, status: 'pendente' },
-      { id: 'l3', aluno: 'Amanda Pires', curso: 'Direito', empresa: 'Mota Advocacia (fictícia)', sup: 'Paulo Mota', periodo: `${d(-8)} a ${d(-4)}`, horas: 32, dias: 5, status: 'pendente' }
+      { id: 'c2', prec: 'ana', turno: `${du(2)} · UBS Centro · matutino`, enviada: d(-1), antec: 3, prazo: d(0), st: 'aguardando' },
+      { id: 'c3', prec: 'juliana', turno: `${du(1)} · Hospital Municipal · matutino`, enviada: d(-1), antec: 2, prazo: d(0), st: 'curta' },
+      { id: 'c4', prec: 'diego', turno: `${du(2)} · Laboratório Vida · matutino`, enviada: d(-5), antec: 7, prazo: d(-4), st: 'silencio' },
+      { id: 'c5', prec: 'paula', turno: `${du(3)} · Centro de Imagem Sul · vespertino`, enviada: d(-2), antec: 5, prazo: d(1), st: 'aguardando' }
     ],
     ocorrencias: [
       { cod: 'OC-001', data: d(-4), tipo: 'bio', aluno: 'Lucas Ferreira', local: 'Hospital Municipal', feitos: [true, true, true, true, true, false] }
@@ -157,8 +178,26 @@ export function criarEstado() {
   };
 }
 
+// Andamento do campo de estágio de cada aluno (etapas em ETAPAS)
+function criarCampo(d) {
+  const LOCAL = { enf1: 'hm', enf2: 'ubs', fis1: 'cr', nut1: 'hm', bio1: 'lab', rad1: 'hm' };
+  const EXCECOES = {
+    'enf1:0': [4, -2], 'enf2:3': [3, -1], 'fis1:3': [2, -1], 'nut1:0': [3, -3],
+    'bio1:7': [0, -1], 'bio1:8': [0, -1], 'rad1:2': [1, -9, 'ci'], 'rad1:3': [1, -3, 'ci']
+  };
+  const campo = {};
+  GRUPOS.forEach((g) => g.alunos.forEach((_, i) => {
+    const k = `${g.id}:${i}`;
+    const [etapa, quando, loc] = EXCECOES[k] || [5, -40];
+    const datas = {};
+    for (let e = 0; e <= etapa; e++) datas[e] = d(quando - (etapa - e) * 2);
+    campo[k] = { etapa, local: loc || LOCAL[g.id], datas, resp: 'Coordenação do polo', protocolo: etapa >= 1 ? `CH-${String(1040 + i * 7 + g.id.length).padStart(5, '0')}` : '' };
+  }));
+  return campo;
+}
+
 function criarDocumentos() {
-  const S = (id, arq, onde, destino, trecho, mudanca, alerta = '') => ({ id, arq, onde, destino, trecho, mudanca, alerta, status: 'pendente' });
+  const S = (id, arq, onde, destino, trecho, mudanca, alerta = '', status = 'pendente') => ({ id, arq, onde, destino, trecho, mudanca, alerta, status });
   return {
     calendario: false,
     arquivos: [
@@ -167,7 +206,10 @@ function criarDocumentos() {
       { nome: 'Organização de estágio.pdf', desc: 'Planilhas de escala e de prazos de contratação', st: 'lido' },
       { nome: 'Manual do candidato 2024.pdf', desc: 'Admissão e convocação do preceptor', st: 'lido' },
       { nome: 'Como cadastrar as horas de estágio.pptx', desc: 'Lançamento de horas no AVA', st: 'lido' },
-      { nome: 'PPC Enfermagem 2023.pdf (exemplo)', desc: 'Projeto pedagógico do curso', st: 'lido' }
+      { nome: 'PPC Enfermagem 2023.pdf (exemplo)', desc: 'Projeto pedagógico do curso', st: 'lido' },
+      { nome: 'Ficha de dados para cadastro de campo de estágio.docx', desc: 'Ficha que o aluno entrega ao polo', st: 'lido' },
+      { nome: 'Edição do cadastro de horas.jpg', desc: 'Regras de lançamento das horas no AVA', st: 'lido' },
+      { nome: 'Modelo de lista de concluintes (Enfermagem).docx', desc: 'Comunicação de concluintes ao conselho', st: 'lido' }
     ],
     sug: [
       S('s1', 'Modelos.pdf', 'pág. 1', 'Convênios', 'Viemos através deste, demonstrar interesse em firmar convênio com sua instituição…', 'Vira o modelo do e-mail de pedido e de renovação de convênio.'),
@@ -180,7 +222,11 @@ function criarDocumentos() {
       S('s8', 'Manual do candidato 2024.pdf', 'pág. 16', 'Escala', 'O monitor só poderá iniciar as atividades no campo de estágio após o aceite da convocação.', 'Turno sem aceite do preceptor fica bloqueado para registro de presença.'),
       S('s9', 'Como cadastrar as horas de estágio.pptx', 'slide 6', 'Escala', 'Na coluna MATUTINO: INÍCIO 07:30, FIM 13:30', 'Turno matutino de 07:30 a 13:30.'),
       S('s10', 'Como cadastrar as horas de estágio.pptx', 'slides 2 a 8', 'Alunos e horas', 'Data inicial, data final e horários por turno, lançados em EDITAR ESTÁGIO', 'A conferência para o AVA passa a sair nesse formato: período e turno por aluno, pronto para copiar.'),
-      S('s11', 'PPC Enfermagem 2023.pdf (exemplo)', 'pág. 42', 'Cursos e regras', 'Estágio Curricular Supervisionado: 500 horas em ambiente hospitalar e 300 horas na atenção básica', 'Atualiza a matriz das turmas de Enfermagem de 480h + 320h (exemplo) para 500h + 300h (PPC).')
+      S('s11', 'PPC Enfermagem 2023.pdf (exemplo)', 'pág. 42', 'Cursos e regras', 'Estágio Curricular Supervisionado: 500 horas em ambiente hospitalar e 300 horas na atenção básica', 'Atualiza a matriz das turmas de Enfermagem de 480h + 320h (exemplo) para 500h + 300h (PPC).'),
+      S('s12', 'Ficha de dados para cadastro de campo de estágio.docx', 'pág. 1', 'Campo de estágio', 'Nome do supervisor de campo · graduação · número do registro no conselho de classe · tipo de escola/empresa', 'A ficha do campo passa a pedir supervisor de campo com registro no conselho e o tipo do local.', '', 'aplicada'),
+      S('s13', 'Edição do cadastro de horas.jpg', 'imagem', 'Escala', 'máximo 06h por dia = 30 horas semanais (sábado e domingo o sistema não permite)', 'A escala bloqueia sábado e domingo e confere 6h por dia e 30h por semana por aluno.', '', 'aplicada'),
+      S('s14', 'Edição do cadastro de horas.jpg', 'imagem', 'Campo de estágio', 'A data de início e data de término precisam contemplar a carga horária total do estágio (feriados nacionais não contam)', 'Cria a calculadora de datas para o aluno lançar no AVA.', '', 'aplicada'),
+      S('s15', 'Modelo de lista de concluintes (Enfermagem).docx', 'pág. 1', 'MEC, LGPD e normas', 'Ao COREN-SC … relação de alunos que concluíram o curso … e colaram grau', 'Gera a lista de concluintes para o conselho de cada curso.', '', 'aplicada'),
     ],
     perg: [
       { id: 'q1', fonte: 'Organização de estágio.pdf · pág. 2', trecho: 'TOTAL DE HORAS MENSAIS = 55 h', pergunta: 'Esse limite de 55h no mês é por preceptor ou por grupo de alunos?', nota: '', opcoes: ['Por preceptor', 'Por grupo de alunos'], resposta: '' },

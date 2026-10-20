@@ -39,7 +39,7 @@ const CURSOS_INFO = [
 ];
 
 export default function Cursos() {
-  const { toast } = useStore();
+  const { s, up, toast, registrar } = useStore();
   const [sel, setSel] = useState('enf');
   const c = CURSOS_INFO.find((x) => x.id === sel);
   return (
@@ -47,6 +47,27 @@ export default function Cursos() {
       <Cabecalho titulo="Cursos e regras" texto="Cada curso carrega a sua diretriz, a matriz de horas por cenário, o conselho e os documentos exigidos. A escala e as horas usam essas regras.">
         <span className="selo-demo">Itens "confirmar" precisam de validação</span>
       </Cabecalho>
+      <section className="card">
+        <div><h2>Jornada do aluno e lançamento no AVA</h2><p className="apagado" style={{ fontSize: 14, marginTop: 4 }}>Valem para todos os cursos. A escala não deixa salvar um turno que quebre estas regras.</p></div>
+        <div className="grid-auto">
+          <div className="regra"><div><strong>Até 6h por dia</strong><span className="sub">Lei 11.788/2008, art. 10</span></div><Chip tom="ok">Sempre ligada</Chip></div>
+          <div className="regra"><div><strong>Até 30h por semana</strong><span className="sub">Lei 11.788/2008, art. 10</span></div><Chip tom="ok">Sempre ligada</Chip></div>
+          <div className="regra"><div><strong>Feriado nacional não conta</strong><span className="sub">regra do AVA da instituição</span></div><Chip tom="ok">Sempre ligada</Chip></div>
+        </div>
+        <div className="regra">
+          <div style={{ flex: '1 1 320px' }}>
+            <strong>O AVA aceita horas no sábado e no domingo?</strong>
+            <span className="sub">No AVA da Anhanguera e da Unopar, não: o sistema não deixa preencher sábado e domingo. Se a instituição aceitar, a escala libera o fim de semana.</span>
+            {s.regras.fdsDemo && <span className="sub txt-at">Hoje é fim de semana: a demonstração deixa ligado para o turno de hoje existir.</span>}
+          </div>
+          <div className="abas" role="radiogroup" aria-label="AVA aceita fim de semana">
+            {[[false, 'Não aceita'], [true, 'Aceita']].map(([v, l]) => (
+              <button key={l} role="radio" aria-checked={s.regras.fds === v} className={s.regras.fds === v ? 'sel' : ''} onClick={() => { up((c) => { c.regras.fds = v; }); registrar(`Regra de fim de semana: ${l.toLowerCase()}`); toast(v ? 'Fim de semana liberado na escala.' : 'Sábado e domingo bloqueados na escala.'); }}>{l}</button>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="linha-flex">
         <div role="tablist" aria-label="Cursos" style={{ flex: '1 1 220px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {CURSOS_INFO.map((x) => (

@@ -1,6 +1,11 @@
+import { useState } from 'react';
 import { useStore } from '../store.jsx';
+import Impressao from '../components/Impressao.jsx';
 import { Cabecalho, Chip } from '../components/ui.jsx';
-import { RELPEND } from '../data/seed.js';
+import { RELPEND, CURSOS, GRUPOS } from '../data/seed.js';
+import { hojeISO, fmtAno, addDias } from '../lib/date.js';
+
+const DESTINO = { enf: 'Coren-SC', fis: 'Crefito da região', nut: 'CRN da região', bio: 'CRBM da região', rad: 'CRTR da região' };
 
 const PERFIS = [
   ['Coordenação do polo', 'Tudo do polo, inclusive documentos de saúde. Cada abertura de documento fica registrada.'],
@@ -24,6 +29,10 @@ const NORMAS = [
 
 export default function Mec() {
   const { s, toast, registrar } = useStore();
+  const H = hojeISO();
+  const [lc, setLc] = useState({ curso: 'enf', conclusao: addDias(H, -30), colacao: addDias(H, -10) });
+  const [verLista, setVerLista] = useState(false);
+  const formandos = GRUPOS.filter((g) => g.curso === lc.curso).flatMap((g) => g.alunos);
   const pastaItens = [
     ['Regulamento de estágio por curso', '5 de 6', 'Farmácia ainda não configurado', false],
     ['Convênios vigentes', `${s.locais.filter((l) => l.fim >= s.criadoEm).length} de ${s.locais.length}`, 'convênio vencido aparece aqui', false],
@@ -63,6 +72,38 @@ export default function Mec() {
           ))}
         </section>
       </div>
+      <section className="card">
+        <div><h2>Lista de concluintes para o conselho</h2><p className="apagado" style={{ fontSize: 14, marginTop: 4 }}>Depois da colação de grau, a instituição informa ao conselho de classe quem concluiu o curso. O EstagIA monta a carta com a lista da turma.</p></div>
+        <div className="form-grid">
+          <label className="campo">Curso
+            <select value={lc.curso} onChange={(e) => setLc({ ...lc, curso: e.target.value })}>
+              {Object.entries(CURSOS).map(([id, c]) => <option key={id} value={id}>{c.nome}</option>)}
+            </select>
+          </label>
+          <label className="campo">Data de conclusão<input type="date" value={lc.conclusao} onChange={(e) => setLc({ ...lc, conclusao: e.target.value })} /></label>
+          <label className="campo">Data da colação de grau<input type="date" value={lc.colacao} onChange={(e) => setLc({ ...lc, colacao: e.target.value })} /></label>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          <button className="btn btn-p" disabled={!lc.conclusao || !lc.colacao} onClick={() => { setVerLista(true); registrar(`Lista de concluintes de ${CURSOS[lc.curso].nome} gerada para o ${DESTINO[lc.curso]}`); }}>Gerar lista para o {DESTINO[lc.curso]}</button>
+          <span className="pequeno apagado">{formandos.length} concluintes na demonstração. Na versão real, entram os alunos com situação "formando" que colaram grau.</span>
+        </div>
+      </section>
+
+      {verLista && (
+        <Impressao titulo={`Lista de concluintes · ${CURSOS[lc.curso].nome}`} onFechar={() => setVerLista(false)}>
+          <h2>Lista de colação de grau · {CURSOS[lc.curso].nome}</h2>
+          <p style={{ textAlign: 'right' }}>[Cidade], {fmtAno(H)}.</p>
+          <p>Ao {DESTINO[lc.curso]}</p>
+          <p>A [Instituição de ensino, com o campus ou polo] informa a relação de alunos que concluíram o curso de {CURSOS[lc.curso].nome} em {fmtAno(lc.conclusao)} e colaram grau em {fmtAno(lc.colacao)}.</p>
+          <table>
+            <thead><tr><th>Nome completo</th><th style={{ width: '32%' }}>CPF</th></tr></thead>
+            <tbody>{formandos.map((n) => <tr key={n}><td>{n}</td><td>[CPF do aluno]</td></tr>)}</tbody>
+          </table>
+          <p>Atenciosamente,</p>
+          <div className="linha-assinatura">[Nome do responsável]<br />[Cargo na instituição de ensino]</div>
+        </Impressao>
+      )}
+
       <section className="card">
         <div><h2>Normas acompanhadas</h2><p className="apagado" style={{ fontSize: 14, marginTop: 4 }}>O que já vale e o que está em tramitação. Quando uma regra muda, o sistema avisa o que precisa ser ajustado.</p></div>
         <div className="scroll"><table className="tbl" style={{ minWidth: 780 }}><thead><tr><th>Norma</th><th>Situação</th><th>O que o sistema faz com ela</th></tr></thead>

@@ -5,9 +5,9 @@ import { pendentesPresenca } from '../lib/calc.js';
 import { useStore } from '../store.jsx';
 
 const GRUPOS_NAV = [
-  ['Operação', [['/polo', 'Painel', true], ['/polo/escala', 'Escala'], ['/polo/presenca', 'Presença'], ['/polo/alunos', 'Alunos e horas']]],
+  ['Operação', [['/polo', 'Painel', true], ['/polo/escala', 'Escala'], ['/polo/presenca', 'Presença'], ['/polo/alunos', 'Alunos e horas'], ['/polo/campo', 'Campo de estágio']]],
   ['Cadastros', [['/polo/cursos', 'Cursos e regras'], ['/polo/convenios', 'Convênios e vagas'], ['/polo/preceptores', 'Preceptores']]],
-  ['Acompanhamento', [['/polo/avaliacoes', 'Avaliações e relatórios'], ['/polo/ocorrencias', 'Ocorrências'], ['/polo/empresa', 'Estágio em empresa']]],
+  ['Acompanhamento', [['/polo/avaliacoes', 'Avaliações e relatórios'], ['/polo/ocorrencias', 'Ocorrências']]],
   ['Gestão', [['/polo/mec', 'MEC, LGPD e normas'], ['/polo/documentos', 'Documentos da instituição']]]
 ];
 
